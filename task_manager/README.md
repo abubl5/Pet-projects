@@ -1,22 +1,24 @@
 # Task Manager API (FastAPI)
 
-Таск менеджер - REST API для управления задачами  
-Сделан, чтобы потренироваться в работе с FastAPI, PostgreSQL и Docker.
+Task Manager is a REST API for managing tasks.
 
-Возможности:
-- Создание задачи
-- Получение списка задач
-- Обновление статуса (completed)
-- Удаление задачи
-- Автоматическая Swagger-документация
+Built to practice working with FastAPI, PostgreSQL, and Docker.
 
-Стек:
-- Python 3.11
-- FastAPI
-- SQLAlchemy
-- PostgreSQL
-- Docker
+```markdown
+Features:
+    Create a task
+    Retrieve the list of tasks
+    Update task status (completed)
+    Delete a task
+    Automatic Swagger documentation
 
-Запуск:
-```bash
-docker compose up --build
+```
+```markdown
+Tech Stack:
+    Python 3.11
+    FastAPI
+    SQLAlchemy
+    PostgreSQL
+    Docker
+```
+
