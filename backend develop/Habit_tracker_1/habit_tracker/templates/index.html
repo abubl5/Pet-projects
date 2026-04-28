@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Трекер привычек</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Мои привычки</h1>
+
+        {% if error %}
+            <p class="error-message">{{ error }}</p>
+        {% endif %}
+
+        <div class="habit-list">
+            {% if habits %}
+                {% for habit in habits %}
+                <div class="habit-item">
+                    <div class="habit-info">
+                        <a href="{{ url_for('habit-detail', habit_id=habit.id) }}" class="habit-link">
+                            {{ habit.name }}
+                        </a>
+                        <span class="streak" title="Дней подряд">🔥 {{ habit.streak }}</span>
+                    </div>
+                    <div class="habit-actions">
+                        {% if TODAY not in habit.marks %}
+                            <form action="{{ url_for('mark_habit_from_form', habit_id=habit.id) }}" method="post" style="display: inline;">
+                                <button type="submit" class="mark-button">Выполнил сегодня</button>
+                            </form>
+                        {% else %}
+                            <span class="marked-today-message">✅ Отмечено!</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>У вас пока нет привычек. Добавьте первую!</p>
+            {% endif %}
+        </div>
+
+        <div class="add-habit-form">
+            <h2>Добавить новую привычку</h2>
+            <form action="{{ url_for('add_habit_from_form') }}" method="post">
+                <input type="text" name="name" placeholder="Название привычки" required>
+                <button type="submit" class="mark-button">Добавить</button>
+            </form>
+        </div>
+
+        <div class="navigation-links">
+            <p><a href="{{ url_for('stats-page') }}" class="stats-link">📊 Посмотреть статистику</a></p>
+            <p><a href="/docs" class="stats-link">📘 Документация API (Swagger)</a></p>
+        </div>
+    </div>
+</body>
+</html>

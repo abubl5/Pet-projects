@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Детали привычки: {{ habit.name }}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <a href="{{ url_for('main-page') }}" class="back-link">&larr; К списку привычек</a>
+        <h1>{{ habit.name }}</h1>
+        <p class="streak">Текущая серия: 🔥 {{ habit.streak }}</p>
+
+        <div class="edit-form">
+            <h2>Редактировать привычку</h2>
+            <form action="{{ url_for('edit_habit_from_form', habit_id=habit.id) }}" method="post">
+                <input type="text" name="name" value="{{ habit.name }}" required>
+                <button type="submit" class="btn">Сохранить</button>
+            </form>
+        </div>
+
+        <div class="marks-history">
+            <h2>История выполнений</h2>
+            {% if habit.marks %}
+                <ul>
+                    {% for mark in habit.marks|sort(reverse=True) %}
+                    <li>{{ mark.strftime('%d.%m.%Y') if mark is date else mark }}</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>Пока нет отметок.</p>
+            {% endif %}
+        </div>
+
+        <div class="delete-action">
+            <form action="{{ url_for('delete_habit_from_form', habit_id=habit.id) }}" method="post" onsubmit="return confirm('Вы уверены, что хотите удалить эту привычку?');">
+                <button type="submit" class="btn btn-danger">Удалить привычку</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
+

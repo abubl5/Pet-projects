@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Статистика привычек</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <a href="{{ url_for('main-page') }}" class="back-link">&larr; Назад к привычкам</a>
+        <h1>📊 Статистика привычек</h1>
+
+        {% if error %}
+            <p class="error-message">{{ error }}</p>
+        {% endif %}
+
+        {% if stats %}
+            <div class="stats-grid">
+                {% for habit_stats in stats %}
+                    <div class="habit-stats-card">
+                        <h2>{{ habit_stats.name }}</h2>
+                        <p><strong>Всего выполнений:</strong> {{ habit_stats.total_marks }}</p>
+                        <p><strong>Текущий streak:</strong> {{ habit_stats.current_streak }} дн.</p>
+                        <p><strong>Максимальный streak:</strong> {{ habit_stats.max_streak }} дн.</p>
+                        <p><strong>Процент успешных дней:</strong> {{ "%.1f"|format(habit_stats.success_rate) }}%</p>
+                        <p><strong>Последние отметки:</strong></p>
+                        <ul class="last-marks-list">
+                            {% for date in habit_stats.last_dates %}
+                                <li>{{ date.strftime('%Y-%m-%d') }}</li>
+                            {% else %}
+                                <li>Нет последних отметок</li>
+                            {% endfor %}
+                        </ul>
+                        <p><a href="{{ url_for('habit-detail', habit_id=habit_stats.id) }}" class="detail-link">Подробнее о привычке</a></p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>Статистика пока недоступна, добавьте привычки и отметьте их выполнение.</p>
+        {% endif %}
+    </div>
+    <script src="{{ url_for('static', path='js/script.js') }}"></script>
+</body>
+</html>
