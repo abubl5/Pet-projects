@@ -1,0 +1,56 @@
+//line /Users/r1/PROEKT GO/a.lvov/internal/auth/auth.go:1:1
+// Пакет auth отвечает за генерацию и проверку токенов аутентификации.
+// Токен - это случайная уникальная строка (например, UUID или hex-строка),
+// которая однозначно связана с конкретным пользователем.
+//
+// Внутри пакета нужно хранить соответствие токен -> userID.
+// Используйте для этого map с защитой от конкурентного доступа.
+// Реализуйте этот пакет самостоятельно.
+package auth
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"sync"
+)
+
+// ErrInvalidToken возвращается, если токен не найден или недействителен.
+var ErrInvalidToken = errors.New("недействительный токен")
+
+var (
+	tokens = make(map[string]int64)
+	mu     sync.RWMutex
+)
+
+// GenerateToken создаёт новый токен для пользователя с указанным ID
+// и сохраняет связь токен -> userID внутри пакета.
+func GenerateToken(userID int64) (string, error) {goCover_ac6dbbc1e1f9__0[0] = 3 ; goCover_ac6dbbc1e1f9__0[1] = goCover_ac6dbbc1e1f9_P ; goCover_ac6dbbc1e1f9__0[2] = 0 ; goCover_ac6dbbc1e1f9__0[3] = 1;
+	b := make([]byte, 16)
+
+	if _, err := rand.Read(b); err != nil {goCover_ac6dbbc1e1f9__0[5] = 1;
+		return "", err
+	}
+
+	goCover_ac6dbbc1e1f9__0[4] = 1;token := hex.EncodeToString(b)
+
+	mu.Lock()
+	tokens[token] = userID
+	mu.Unlock()
+
+	return token, nil
+}
+
+// ValidateToken проверяет токен и возвращает ID пользователя.
+// Возвращает ErrInvalidToken если токен не найден.
+func ValidateToken(token string) (int64, error) {goCover_ac6dbbc1e1f9__1[0] = 3 ; goCover_ac6dbbc1e1f9__1[1] = goCover_ac6dbbc1e1f9_P ; goCover_ac6dbbc1e1f9__1[2] = 1 ; goCover_ac6dbbc1e1f9__1[3] = 1;
+	mu.RLock()
+	userID, exists := tokens[token]
+	mu.RUnlock()
+
+	if !exists {goCover_ac6dbbc1e1f9__1[5] = 1;
+		return 0, ErrInvalidToken
+	}
+
+	goCover_ac6dbbc1e1f9__1[4] = 1;return userID, nil
+}

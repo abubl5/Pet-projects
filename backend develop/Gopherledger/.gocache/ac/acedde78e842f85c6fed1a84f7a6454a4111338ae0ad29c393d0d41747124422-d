@@ -1,0 +1,448 @@
+//line /Users/r1/PROEKT GO/a.lvov/internal/handler/handler.go:1:1
+// Пакет handler содержит HTTP-обработчики.
+//
+// Взаимодействие с бизнес-логикой осуществляется через интерфейс.
+// Определите этот интерфейс здесь, по месту использования.
+// Реализуйте все обработчики самостоятельно.
+package handler
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"gopherledger/internal/domain"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type Service interface {
+	RegisterUser(login, password string) (string, error)
+	LoginUser(login, password string) (string, error)
+	CreateOrder(userID int64, number string) (*domain.Order, error)
+	GetUserOrders(userID int64) ([]domain.Order, error)
+	GetAllUsers() ([]domain.User, error)
+	GetAllOrders() ([]domain.Order, error)
+	GetBalance(userID int64) (domain.Balance, error)
+	Withdraw(userID int64, orderNumber string, sum float64) error
+	GetWithdrawals(userID int64) ([]domain.Withdrawal, error)
+	GetAllWithdrawals() ([]domain.Withdrawal, error)
+}
+
+type authRequest struct {
+	Login    string `json:"login"`
+	Password string `json:"password"`
+}
+
+type errorResponse struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+type withdrawRequest struct {
+	Order string  `json:"order"`
+	Sum   float64 `json:"sum"`
+}
+
+type orderResponse struct {
+	Number     string    `json:"number"`
+	Status     string    `json:"status"`
+	Accrual    *float64  `json:"accrual,omitempty"`
+	UploadedAt time.Time `json:"uploaded_at"`
+}
+
+type balanceResponse struct {
+	Current   float64 `json:"current"`
+	Withdrawn float64 `json:"withdrawn"`
+}
+
+type withdrawalResponse struct {
+	Order       string    `json:"order"`
+	Sum         float64   `json:"sum"`
+	ProcessedAt time.Time `json:"processed_at"`
+}
+
+// Handler хранит зависимость от бизнес-логики.
+// Замените interface{} на свой интерфейс.
+type Handler struct {
+	svc Service
+}
+
+// New создаёт Handler.
+func New(svc Service) *Handler {goCover_7faa96d72261__0[0] = 1 ; goCover_7faa96d72261__0[1] = goCover_7faa96d72261_P ; goCover_7faa96d72261__0[2] = 0 ; goCover_7faa96d72261__0[3] = 1;
+	return &Handler{svc: svc}
+}
+
+// ---------------------------------------------------------------------------
+// Вспомогательные функции для ответов - предоставлены
+// ---------------------------------------------------------------------------
+
+// writeError записывает JSON-ответ с ошибкой.
+// Клиент видит только userMsg. Внутренние детали пишутся только в лог.
+// Прочитайте ТЗ и создайте структуру тела ответа самостоятельно.
+
+func writeError(w http.ResponseWriter, status int, code, userMsg string, internalErr error) {goCover_7faa96d72261__1[0] = 4 ; goCover_7faa96d72261__1[1] = goCover_7faa96d72261_P ; goCover_7faa96d72261__1[2] = 1 ; goCover_7faa96d72261__1[3] = 1;
+	if internalErr != nil {goCover_7faa96d72261__1[5] = 1;
+		log.Printf("ошибка code=%s status=%d: %v", code, status, internalErr)
+	}
+	goCover_7faa96d72261__1[4] = 1;w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	resp := errorResponse{
+		Code:    code,
+		Message: userMsg,
+	}
+
+	if err := json.NewEncoder(w).Encode(resp); err != nil {goCover_7faa96d72261__1[6] = 1;
+		log.Printf("writeError: %v", err)
+	}
+}
+
+// writeJSON записывает успешный JSON-ответ.
+func writeJSON(w http.ResponseWriter, status int, v any) {goCover_7faa96d72261__2[0] = 2 ; goCover_7faa96d72261__2[1] = goCover_7faa96d72261_P ; goCover_7faa96d72261__2[2] = 2 ; goCover_7faa96d72261__2[3] = 1;
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {goCover_7faa96d72261__2[4] = 1;
+		log.Printf("writeJSON: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Обработчики - реализуйте самостоятельно
+// ---------------------------------------------------------------------------
+
+// Register обрабатывает POST /api/user/register.
+// При успехе: 200 OK, заголовок Authorization с токеном.
+// При дублировании логина: 409 Conflict.
+// При некорректных данных: 400 Bad Request.
+func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {goCover_7faa96d72261__3[0] = 9 ; goCover_7faa96d72261__3[1] = goCover_7faa96d72261_P ; goCover_7faa96d72261__3[2] = 3 ; goCover_7faa96d72261__3[3] = 1;
+	var req authRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {goCover_7faa96d72261__3[7] = 1;
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Некорректное тело запроса", err)
+		return
+	}
+
+	goCover_7faa96d72261__3[4] = 1;if req.Login == "" || req.Password == "" {goCover_7faa96d72261__3[8] = 1;
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Логин и пароль обязательны", nil)
+		return
+	}
+
+	goCover_7faa96d72261__3[5] = 1;token, err := h.svc.RegisterUser(req.Login, req.Password)
+	if err != nil {goCover_7faa96d72261__3[9] = 1;
+		if errors.Is(err, domain.ErrUserExists) {goCover_7faa96d72261__3[11] = 1;
+			writeError(w, http.StatusConflict, "USER_EXISTS", "Пользователь уже существует", err)
+			return
+		}
+		goCover_7faa96d72261__3[10] = 1;writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера", err)
+		return
+	}
+
+	goCover_7faa96d72261__3[6] = 1;w.Header().Set("Authorization", token)
+	w.WriteHeader(http.StatusOK)
+}
+
+// Login обрабатывает POST /api/user/login.
+// При успехе: 200 OK, заголовок Authorization с токеном.
+// При неверных данных: 401 Unauthorized.
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {goCover_7faa96d72261__4[0] = 9 ; goCover_7faa96d72261__4[1] = goCover_7faa96d72261_P ; goCover_7faa96d72261__4[2] = 4 ; goCover_7faa96d72261__4[3] = 1;
+	var req authRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {goCover_7faa96d72261__4[7] = 1;
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Некорректное тело запроса", err)
+		return
+	}
+
+	goCover_7faa96d72261__4[4] = 1;if req.Login == "" || req.Password == "" {goCover_7faa96d72261__4[8] = 1;
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Логин и пароль обязательны", nil)
+		return
+	}
+
+	goCover_7faa96d72261__4[5] = 1;token, err := h.svc.LoginUser(req.Login, req.Password)
+	if err != nil {goCover_7faa96d72261__4[9] = 1;
+		if errors.Is(err, domain.ErrUserNotFound) || errors.Is(err, domain.ErrInvalidPassword) {goCover_7faa96d72261__4[11] = 1;
+			writeError(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Неверный логин или пароль", err)
+			return
+		}
+		goCover_7faa96d72261__4[10] = 1;writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера", err)
+		return
+	}
+
+	goCover_7faa96d72261__4[6] = 1;w.Header().Set("Authorization", token)
+	w.WriteHeader(http.StatusOK)
+}
+
+// CreateOrder обрабатывает POST /api/user/orders.
+// Тело запроса: номер заказа в виде обычного текста.
+// 202 Accepted  - новый заказ принят в обработку.
+// 200 OK        - заказ уже загружен этим пользователем.
+// 409 Conflict  - заказ принадлежит другому пользователю.
+// 422 Unprocessable Entity - номер не прошёл проверку Луна.
+func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {goCover_7faa96d72261__5[0] = 13 ; goCover_7faa96d72261__5[1] = goCover_7faa96d72261_P ; goCover_7faa96d72261__5[2] = 5 ; goCover_7faa96d72261__5[3] = 1;
+	userID, ok := UserIDFromContext(r.Context())
+	if !ok {goCover_7faa96d72261__5[8] = 1;
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Требуется авторизация", nil)
+		return
+	}
+
+	goCover_7faa96d72261__5[4] = 1;body, err := io.ReadAll(r.Body)
+	if err != nil {goCover_7faa96d72261__5[9] = 1;
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Не удалось прочитать тело запроса", err)
+		return
+	}
+
+	goCover_7faa96d72261__5[5] = 1;number := strings.TrimSpace(string(body))
+	if number == "" {goCover_7faa96d72261__5[10] = 1;
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Номер заказа обязателен", nil)
+		return
+	}
+
+	goCover_7faa96d72261__5[6] = 1;_, err = h.svc.CreateOrder(userID, number)
+	if err != nil {goCover_7faa96d72261__5[11] = 1;
+		switch {
+		case errors.Is(err, domain.ErrOrderOwnedByUser):goCover_7faa96d72261__5[12] = 1;
+			w.WriteHeader(http.StatusOK)
+			return
+		case errors.Is(err, domain.ErrOrderExists):goCover_7faa96d72261__5[13] = 1;
+			writeError(w, http.StatusConflict, "ORDER_EXISTS", "Заказ уже загружен другим пользователем", err)
+			return
+		case errors.Is(err, domain.ErrInvalidOrder):goCover_7faa96d72261__5[14] = 1;
+			writeError(w, http.StatusUnprocessableEntity, "INVALID_ORDER", "Неверный номер заказа", err)
+			return
+		default:goCover_7faa96d72261__5[15] = 1;
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера", err)
+			return
+		}
+	}
+
+	goCover_7faa96d72261__5[7] = 1;w.WriteHeader(http.StatusAccepted)
+}
+
+// GetOrders обрабатывает GET /api/user/orders.
+// 200 OK с JSON-массивом заказов или 204 No Content если заказов нет.
+func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {goCover_7faa96d72261__6[0] = 11 ; goCover_7faa96d72261__6[1] = goCover_7faa96d72261_P ; goCover_7faa96d72261__6[2] = 6 ; goCover_7faa96d72261__6[3] = 1;
+	userID, ok := UserIDFromContext(r.Context())
+	if !ok {goCover_7faa96d72261__6[8] = 1;
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Требуется авторизация", nil)
+		return
+	}
+
+	goCover_7faa96d72261__6[4] = 1;orders, err := h.svc.GetUserOrders(userID)
+	if err != nil {goCover_7faa96d72261__6[9] = 1;
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера", err)
+		return
+	}
+
+	goCover_7faa96d72261__6[5] = 1;if len(orders) == 0 {goCover_7faa96d72261__6[10] = 1;
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	goCover_7faa96d72261__6[6] = 1;response := make([]orderResponse, 0, len(orders))
+	for _, order := range orders {goCover_7faa96d72261__6[11] = 1;
+		item := orderResponse{
+			Number:     order.Number,
+			Status:     order.Status,
+			UploadedAt: order.UploadedAt,
+		}
+		if order.Status == domain.OrderStatusProcessed {goCover_7faa96d72261__6[13] = 1;
+			accrual := order.Accrual
+			item.Accrual = &accrual
+		}
+		goCover_7faa96d72261__6[12] = 1;response = append(response, item)
+	}
+
+	goCover_7faa96d72261__6[7] = 1;writeJSON(w, http.StatusOK, response)
+}
+
+// GetBalance обрабатывает GET /api/user/balance.
+func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {goCover_7faa96d72261__7[0] = 5 ; goCover_7faa96d72261__7[1] = goCover_7faa96d72261_P ; goCover_7faa96d72261__7[2] = 7 ; goCover_7faa96d72261__7[3] = 1;
+	userID, ok := UserIDFromContext(r.Context())
+	if !ok {goCover_7faa96d72261__7[6] = 1;
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Требуется авторизация", nil)
+		return
+	}
+
+	goCover_7faa96d72261__7[4] = 1;balance, err := h.svc.GetBalance(userID)
+	if err != nil {goCover_7faa96d72261__7[7] = 1;
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера", err)
+		return
+	}
+
+	goCover_7faa96d72261__7[5] = 1;writeJSON(w, http.StatusOK, balanceResponse{
+		Current:   balance.Current,
+		Withdrawn: balance.Withdrawn,
+	})
+}
+
+// Withdraw обрабатывает POST /api/user/balance/withdraw.
+// 200 OK при успехе.
+// 402 Payment Required при нехватке баллов.
+// 422 Unprocessable Entity при неверном номере заказа.
+func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {goCover_7faa96d72261__8[0] = 12 ; goCover_7faa96d72261__8[1] = goCover_7faa96d72261_P ; goCover_7faa96d72261__8[2] = 8 ; goCover_7faa96d72261__8[3] = 1;
+	userID, ok := UserIDFromContext(r.Context())
+	if !ok {goCover_7faa96d72261__8[8] = 1;
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Требуется авторизация", nil)
+		return
+	}
+
+	goCover_7faa96d72261__8[4] = 1;var req withdrawRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {goCover_7faa96d72261__8[9] = 1;
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Некорректное тело запроса", err)
+		return
+	}
+
+	goCover_7faa96d72261__8[5] = 1;if req.Order == "" || req.Sum <= 0 {goCover_7faa96d72261__8[10] = 1;
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Неверные данные для списания", nil)
+		return
+	}
+
+	goCover_7faa96d72261__8[6] = 1;err := h.svc.Withdraw(userID, req.Order, req.Sum)
+	if err != nil {goCover_7faa96d72261__8[11] = 1;
+		switch {
+		case errors.Is(err, domain.ErrInsufficientFunds):goCover_7faa96d72261__8[12] = 1;
+			writeError(w, http.StatusPaymentRequired, "INSUFFICIENT_FUNDS", "Недостаточно баллов", err)
+			return
+		case errors.Is(err, domain.ErrInvalidOrder):goCover_7faa96d72261__8[13] = 1;
+			writeError(w, http.StatusUnprocessableEntity, "INVALID_ORDER", "Неверный номер заказа", err)
+			return
+		default:goCover_7faa96d72261__8[14] = 1;
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера", err)
+			return
+		}
+	}
+
+	goCover_7faa96d72261__8[7] = 1;w.WriteHeader(http.StatusOK)
+}
+
+// GetWithdrawals обрабатывает GET /api/user/withdrawals.
+// 200 OK с массивом или 204 No Content если списаний нет.
+func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {goCover_7faa96d72261__9[0] = 9 ; goCover_7faa96d72261__9[1] = goCover_7faa96d72261_P ; goCover_7faa96d72261__9[2] = 9 ; goCover_7faa96d72261__9[3] = 1;
+	userID, ok := UserIDFromContext(r.Context())
+	if !ok {goCover_7faa96d72261__9[8] = 1;
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Требуется авторизация", nil)
+		return
+	}
+
+	goCover_7faa96d72261__9[4] = 1;withdrawals, err := h.svc.GetWithdrawals(userID)
+	if err != nil {goCover_7faa96d72261__9[9] = 1;
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера", err)
+		return
+	}
+
+	goCover_7faa96d72261__9[5] = 1;if len(withdrawals) == 0 {goCover_7faa96d72261__9[10] = 1;
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	goCover_7faa96d72261__9[6] = 1;response := make([]withdrawalResponse, 0, len(withdrawals))
+	for _, withdrawal := range withdrawals {goCover_7faa96d72261__9[11] = 1;
+		response = append(response, withdrawalResponse{
+			Order:       withdrawal.OrderNumber,
+			Sum:         withdrawal.Sum,
+			ProcessedAt: withdrawal.ProcessedAt,
+		})
+	}
+
+	goCover_7faa96d72261__9[7] = 1;writeJSON(w, http.StatusOK, response)
+}
+
+// ExportStats обрабатывает POST /api/stats/export.
+// Собирает статистику системы и записывает её в текстовый файл stats.txt
+// в корне проекта. Возвращает 200 OK при успехе.
+//
+// Файл должен содержать:
+//   - общее число зарегистрированных пользователей
+//   - общее число заказов и их распределение по статусам
+//   - суммарное количество начисленных баллов
+//   - суммарное количество списанных баллов
+//   - время генерации отчёта
+//
+// Для работы с файлами используйте пакет os (неделя 8).
+func (h *Handler) ExportStats(w http.ResponseWriter, r *http.Request) {goCover_7faa96d72261__10[0] = 19 ; goCover_7faa96d72261__10[1] = goCover_7faa96d72261_P ; goCover_7faa96d72261__10[2] = 10 ; goCover_7faa96d72261__10[3] = 1;
+	_, ok := UserIDFromContext(r.Context())
+	if !ok {goCover_7faa96d72261__10[11] = 1;
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Требуется авторизация", nil)
+		return
+	}
+
+	goCover_7faa96d72261__10[4] = 1;users, err := h.svc.GetAllUsers()
+	if err != nil {goCover_7faa96d72261__10[12] = 1;
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера", err)
+		return
+	}
+
+	goCover_7faa96d72261__10[5] = 1;orders, err := h.svc.GetAllOrders()
+	if err != nil {goCover_7faa96d72261__10[13] = 1;
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера", err)
+		return
+	}
+
+	goCover_7faa96d72261__10[6] = 1;withdrawals, err := h.svc.GetAllWithdrawals()
+	if err != nil {goCover_7faa96d72261__10[14] = 1;
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера", err)
+		return
+	}
+
+	goCover_7faa96d72261__10[7] = 1;newCount := 0
+	processingCount := 0
+	processedCount := 0
+	invalidCount := 0
+	totalAccrual := 0.0
+
+	for _, order := range orders {goCover_7faa96d72261__10[15] = 1;
+		switch order.Status {
+		case domain.OrderStatusNew:goCover_7faa96d72261__10[16] = 1;
+			newCount++
+		case domain.OrderStatusProcessing:goCover_7faa96d72261__10[17] = 1;
+			processingCount++
+		case domain.OrderStatusProcessed:goCover_7faa96d72261__10[18] = 1;
+			processedCount++
+			totalAccrual += order.Accrual
+		case domain.OrderStatusInvalid:goCover_7faa96d72261__10[19] = 1;
+			invalidCount++
+		}
+	}
+
+	goCover_7faa96d72261__10[8] = 1;totalWithdrawn := 0.0
+	for _, withdrawal := range withdrawals {goCover_7faa96d72261__10[20] = 1;
+		totalWithdrawn += withdrawal.Sum
+	}
+
+	goCover_7faa96d72261__10[9] = 1;report := strings.Join([]string{
+		"users: " + strconv.Itoa(len(users)),
+		"orders_total: " + strconv.Itoa(len(orders)),
+		"orders_new: " + strconv.Itoa(newCount),
+		"orders_processing: " + strconv.Itoa(processingCount),
+		"orders_processed: " + strconv.Itoa(processedCount),
+		"orders_invalid: " + strconv.Itoa(invalidCount),
+		"total_accrual: " + strconv.FormatFloat(totalAccrual, 'f', -1, 64),
+		"total_withdrawn: " + strconv.FormatFloat(totalWithdrawn, 'f', -1, 64),
+		"report_generated_at: " + time.Now().Format(time.RFC3339),
+	}, "\n")
+
+	if err := os.WriteFile("stats.txt", []byte(report), 0644); err != nil {goCover_7faa96d72261__10[21] = 1;
+		writeError(w, http.StatusInternalServerError, "EXPORT_FAILED", "Не удалось сохранить статистику", err)
+		return
+	}
+
+	goCover_7faa96d72261__10[10] = 1;w.WriteHeader(http.StatusOK)
+}
+
+// ---------------------------------------------------------------------------
+// Вспомогательная функция для работы с контекстом - предоставлена
+// ---------------------------------------------------------------------------
+
+type contextKey string
+
+const CtxKeyUserID contextKey = "userID"
+
+// UserIDFromContext извлекает ID аутентифицированного пользователя из контекста.
+// Возвращает 0, false если значение отсутствует.
+func UserIDFromContext(ctx context.Context) (int64, bool) {goCover_7faa96d72261__11[0] = 1 ; goCover_7faa96d72261__11[1] = goCover_7faa96d72261_P ; goCover_7faa96d72261__11[2] = 11 ; goCover_7faa96d72261__11[3] = 1;
+	// реализуйте самостоятельно
+	userID, ok := ctx.Value(CtxKeyUserID).(int64)
+	return userID, ok
+}

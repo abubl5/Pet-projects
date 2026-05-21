@@ -1,0 +1,136 @@
+//line /Users/r1/PROEKT GO/a.lvov/internal/middleware/middleware.go:1:1
+// Пакет middleware содержит HTTP-middleware.
+// Реализуйте Auth, Logging и Recover самостоятельно.
+package middleware
+
+import (
+	"context"
+	"encoding/json"
+	"log"
+	"net/http"
+	"time"
+
+	"gopherledger/internal/auth"
+	"gopherledger/internal/handler"
+)
+
+var logLevel = "info"
+
+type errorResponse struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// SetLogLevel задаёт уровень логирования middleware.
+func SetLogLevel(level string) {goCover_7f16c19d5d43__0[0] = 3 ; goCover_7f16c19d5d43__0[1] = goCover_7f16c19d5d43_P ; goCover_7f16c19d5d43__0[2] = 0 ; goCover_7f16c19d5d43__0[3] = 1;
+	if level == "" {goCover_7f16c19d5d43__0[5] = 1;
+		logLevel = "info"
+		return
+	}
+	goCover_7f16c19d5d43__0[4] = 1;logLevel = level
+}
+
+func writeJSONError(w http.ResponseWriter, status int, code, message string) {goCover_7f16c19d5d43__1[0] = 2 ; goCover_7f16c19d5d43__1[1] = goCover_7f16c19d5d43_P ; goCover_7f16c19d5d43__1[2] = 1 ; goCover_7f16c19d5d43__1[3] = 1;
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(errorResponse{
+		Code:    code,
+		Message: message,
+	}); err != nil {goCover_7f16c19d5d43__1[4] = 1;
+		log.Printf("middleware writeJSONError: %v", err)
+	}
+}
+
+// Auth проверяет токен из заголовка Authorization и помещает ID пользователя в контекст.
+// Запросы без валидного токена получают ответ 401 Unauthorized.
+//
+// Что нужно сделать:
+//   - прочитать токен из заголовка
+//   - проверить токен через пакет auth
+//   - поместить ID пользователя в контекст запроса
+//   - передать управление следующему handler или вернуть 401
+func Auth(next http.Handler) http.Handler {goCover_7f16c19d5d43__2[0] = 6 ; goCover_7f16c19d5d43__2[1] = goCover_7f16c19d5d43_P ; goCover_7f16c19d5d43__2[2] = 2 ; goCover_7f16c19d5d43__2[3] = 1;
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {goCover_7f16c19d5d43__2[4] = 1;
+		token := r.Header.Get("Authorization")
+		if token == "" {goCover_7f16c19d5d43__2[7] = 1;
+			writeJSONError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Требуется авторизация")
+			return
+		}
+
+		goCover_7f16c19d5d43__2[5] = 1;userID, err := auth.ValidateToken(token)
+		if err != nil {goCover_7f16c19d5d43__2[8] = 1;
+			writeJSONError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Требуется авторизация")
+			return
+		}
+
+		goCover_7f16c19d5d43__2[6] = 1;ctx := context.WithValue(r.Context(), handler.CtxKeyUserID, userID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// statusRecorder оборачивает http.ResponseWriter для перехвата статус-кода.
+// Используйте эту структуру в Logging.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (sr *statusRecorder) WriteHeader(status int) {goCover_7f16c19d5d43__3[0] = 1 ; goCover_7f16c19d5d43__3[1] = goCover_7f16c19d5d43_P ; goCover_7f16c19d5d43__3[2] = 3 ; goCover_7f16c19d5d43__3[3] = 1;
+	sr.status = status
+	sr.ResponseWriter.WriteHeader(status)
+}
+
+func (sr *statusRecorder) Write(b []byte) (int, error) {goCover_7f16c19d5d43__4[0] = 3 ; goCover_7f16c19d5d43__4[1] = goCover_7f16c19d5d43_P ; goCover_7f16c19d5d43__4[2] = 4 ; goCover_7f16c19d5d43__4[3] = 1;
+	if sr.status == 0 {goCover_7f16c19d5d43__4[5] = 1;
+		sr.status = http.StatusOK
+	}
+	goCover_7f16c19d5d43__4[4] = 1;return sr.ResponseWriter.Write(b)
+}
+
+// Logging логирует метод, путь, статус ответа и время выполнения каждого запроса.
+//
+// Что нужно сделать:
+//   - зафиксировать время начала запроса
+//   - обернуть w в statusRecorder для перехвата статус-кода
+//   - после выполнения handler записать лог
+func Logging(next http.Handler) http.Handler {goCover_7f16c19d5d43__5[0] = 6 ; goCover_7f16c19d5d43__5[1] = goCover_7f16c19d5d43_P ; goCover_7f16c19d5d43__5[2] = 5 ; goCover_7f16c19d5d43__5[3] = 1;
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {goCover_7f16c19d5d43__5[4] = 1;
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w}
+
+		next.ServeHTTP(rec, r)
+
+		if rec.status == 0 {goCover_7f16c19d5d43__5[7] = 1;
+			rec.status = http.StatusOK
+		}
+
+		goCover_7f16c19d5d43__5[5] = 1;duration := time.Since(start)
+		if logLevel == "debug" {goCover_7f16c19d5d43__5[8] = 1;
+			log.Printf("method=%s path=%s status=%d duration=%s remote=%s user_agent=%q",
+				r.Method, r.URL.Path, rec.status, duration, r.RemoteAddr, r.UserAgent())
+			return
+		}
+
+		goCover_7f16c19d5d43__5[6] = 1;log.Printf("method=%s path=%s status=%d duration=%s",
+			r.Method, r.URL.Path, rec.status, duration)
+	})
+}
+
+// Recover перехватывает панику внутри handler, логирует её и возвращает
+// клиенту ответ 500 Internal Server Error вместо того, чтобы уронить сервер.
+//
+// Что нужно сделать:
+//   - добавить defer с вызовом recover()
+//   - если паника произошла, залогировать её и отдать 500
+func Recover(next http.Handler) http.Handler {goCover_7f16c19d5d43__6[0] = 5 ; goCover_7f16c19d5d43__6[1] = goCover_7f16c19d5d43_P ; goCover_7f16c19d5d43__6[2] = 6 ; goCover_7f16c19d5d43__6[3] = 1;
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {goCover_7f16c19d5d43__6[4] = 1;
+		defer func() {goCover_7f16c19d5d43__6[6] = 1;
+			if rec := recover(); rec != nil {goCover_7f16c19d5d43__6[7] = 1;
+				log.Printf("panic: %v", rec)
+				writeJSONError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера")
+			}
+		}()
+
+		goCover_7f16c19d5d43__6[5] = 1;next.ServeHTTP(w, r)
+	})
+}

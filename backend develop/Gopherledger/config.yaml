@@ -1,0 +1,5 @@
+server_host: "localhost"
+server_port: 8080
+log_level: "info"
+accrual_interval_seconds: 3
+worker_concurrency: 5

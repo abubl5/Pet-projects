@@ -1,0 +1,312 @@
+//line /Users/r1/PROEKT GO/a.lvov/internal/store/store.go:1:1
+// Пакет store реализует хранилище данных в памяти.
+// Используйте отдельные мьютексы для независимых групп данных.
+// Реализуйте этот пакет самостоятельно.
+package store
+
+import (
+	"gopherledger/internal/domain"
+	"sort"
+	"sync"
+	"time"
+)
+
+// Store хранит все данные приложения в памяти.
+// Добавьте средства защиты конкурентного доступа самостоятельно.
+type Store struct {
+	// users хранит пользователей по их ID
+	users map[int64]*domain.User
+
+	// usersByLogin хранит пользователей по логину - для быстрого поиска при авторизации
+	usersByLogin map[string]*domain.User
+
+	// orders хранит заказы по номеру заказа
+	orders map[string]*domain.Order
+
+	// balances хранит текущий баланс каждого пользователя по его ID
+	balances map[int64]*domain.Balance
+
+	// withdrawals хранит историю списаний для каждого пользователя по его ID
+	withdrawals map[int64][]*domain.Withdrawal
+
+	// nextID используется для генерации уникальных числовых ID
+	nextID int64
+
+	usersMu       sync.RWMutex
+	ordersMu      sync.RWMutex
+	balancesMu    sync.RWMutex
+	withdrawalsMu sync.RWMutex
+	idMu          sync.Mutex
+}
+
+// New создаёт и возвращает новое пустое хранилище.
+func New() *Store {goCover_54247914884e__0[0] = 1 ; goCover_54247914884e__0[1] = goCover_54247914884e_P ; goCover_54247914884e__0[2] = 0 ; goCover_54247914884e__0[3] = 1;
+	return &Store{
+		users:        make(map[int64]*domain.User),
+		usersByLogin: make(map[string]*domain.User),
+		orders:       make(map[string]*domain.Order),
+		balances:     make(map[int64]*domain.Balance),
+		withdrawals:  make(map[int64][]*domain.Withdrawal),
+		nextID:       1,
+	}
+}
+
+// CreateUser добавляет нового пользователя.
+// Возвращает domain.ErrUserExists если логин уже занят.
+func (s *Store) CreateUser(login, passwordHash string) (*domain.User, error) {goCover_54247914884e__1[0] = 3 ; goCover_54247914884e__1[1] = goCover_54247914884e_P ; goCover_54247914884e__1[2] = 1 ; goCover_54247914884e__1[3] = 1;
+	s.usersMu.Lock()
+
+	defer s.usersMu.Unlock()
+
+	if _, exist := s.usersByLogin[login]; exist {goCover_54247914884e__1[5] = 1;
+		return nil, domain.ErrUserExists
+	}
+
+	goCover_54247914884e__1[4] = 1;s.idMu.Lock()
+	userID := s.nextID
+	s.nextID++
+	s.idMu.Unlock()
+
+	user := &domain.User{
+		ID:           userID,
+		Login:        login,
+		PasswordHash: passwordHash,
+	}
+
+	s.users[userID] = user
+	s.usersByLogin[login] = user
+
+	s.balancesMu.Lock()
+	s.balances[userID] = &domain.Balance{}
+	s.balancesMu.Unlock()
+
+	userCopy := *user
+	return &userCopy, nil
+}
+
+// GetUserByLogin возвращает пользователя по логину.
+// Возвращает domain.ErrUserNotFound если пользователь не найден.
+func (s *Store) GetUserByLogin(login string) (*domain.User, error) {goCover_54247914884e__2[0] = 3 ; goCover_54247914884e__2[1] = goCover_54247914884e_P ; goCover_54247914884e__2[2] = 2 ; goCover_54247914884e__2[3] = 1;
+	s.usersMu.RLock()
+
+	defer s.usersMu.RUnlock()
+
+	user, exist := s.usersByLogin[login]
+	if !exist {goCover_54247914884e__2[5] = 1;
+		return nil, domain.ErrUserNotFound
+	}
+
+	goCover_54247914884e__2[4] = 1;userCopy := *user
+	return &userCopy, nil
+}
+
+// CreateOrder добавляет новый заказ для пользователя.
+// Возвращает domain.ErrOrderOwnedByUser если этот пользователь уже загружал этот номер.
+// Возвращает domain.ErrOrderExists если номер принадлежит другому пользователю.
+func (s *Store) CreateOrder(userID int64, number string) (*domain.Order, error) {goCover_54247914884e__3[0] = 5 ; goCover_54247914884e__3[1] = goCover_54247914884e_P ; goCover_54247914884e__3[2] = 3 ; goCover_54247914884e__3[3] = 1;
+	s.ordersMu.Lock()
+	defer s.ordersMu.Unlock()
+
+	if existingOrder, exists := s.orders[number]; exists {goCover_54247914884e__3[5] = 1;
+		if existingOrder.UserID == userID {goCover_54247914884e__3[7] = 1;
+			return nil, domain.ErrOrderOwnedByUser
+		}
+		goCover_54247914884e__3[6] = 1;return nil, domain.ErrOrderExists
+	}
+
+	goCover_54247914884e__3[4] = 1;s.idMu.Lock()
+	orderID := s.nextID
+	s.nextID++
+	s.idMu.Unlock()
+
+	order := &domain.Order{
+		ID:         orderID,
+		UserID:     userID,
+		Number:     number,
+		Status:     domain.OrderStatusNew,
+		UploadedAt: time.Now(),
+	}
+	s.orders[number] = order
+
+	orderCopy := *order
+	return &orderCopy, nil
+}
+
+// GetUserOrders возвращает все заказы пользователя, сначала новые.
+func (s *Store) GetUserOrders(userID int64) ([]domain.Order, error) {goCover_54247914884e__4[0] = 6 ; goCover_54247914884e__4[1] = goCover_54247914884e_P ; goCover_54247914884e__4[2] = 4 ; goCover_54247914884e__4[3] = 1;
+	s.ordersMu.RLock()
+	defer s.ordersMu.RUnlock()
+
+	var orders []domain.Order
+	for _, order := range s.orders {goCover_54247914884e__4[6] = 1;
+		if order.UserID == userID {goCover_54247914884e__4[7] = 1;
+			orders = append(orders, *order)
+		}
+	}
+
+	goCover_54247914884e__4[4] = 1;sort.Slice(orders, func(i, j int) bool {goCover_54247914884e__4[8] = 1;
+		return orders[i].UploadedAt.After(orders[j].UploadedAt)
+	})
+
+	goCover_54247914884e__4[5] = 1;return orders, nil
+}
+
+// GetOrdersForProcessing возвращает все заказы в статусе NEW или PROCESSING.
+func (s *Store) GetOrdersForProcessing() ([]domain.Order, error) {goCover_54247914884e__5[0] = 4 ; goCover_54247914884e__5[1] = goCover_54247914884e_P ; goCover_54247914884e__5[2] = 5 ; goCover_54247914884e__5[3] = 1;
+	s.ordersMu.RLock()
+	defer s.ordersMu.RUnlock()
+
+	var orders []domain.Order
+	for _, order := range s.orders {goCover_54247914884e__5[5] = 1;
+		if order.Status == domain.OrderStatusProcessing || order.Status == domain.OrderStatusNew {goCover_54247914884e__5[6] = 1;
+			orders = append(orders, *order)
+		}
+	}
+
+	goCover_54247914884e__5[4] = 1;return orders, nil
+}
+
+// UpdateOrderStatus обновляет статус и начисление заказа.
+// Если статус PROCESSED и accrual > 0, баланс пользователя пополняется.
+func (s *Store) UpdateOrderStatus(number, status string, accrual float64) error {goCover_54247914884e__6[0] = 7 ; goCover_54247914884e__6[1] = goCover_54247914884e_P ; goCover_54247914884e__6[2] = 6 ; goCover_54247914884e__6[3] = 1;
+	s.ordersMu.Lock()
+	order, exist := s.orders[number]
+	if !exist {goCover_54247914884e__6[6] = 1;
+		s.ordersMu.Unlock()
+		return domain.ErrInvalidOrder
+	}
+
+	goCover_54247914884e__6[4] = 1;order.Status = status
+	order.Accrual = accrual
+	userID := order.UserID
+	s.ordersMu.Unlock()
+
+	if status == domain.OrderStatusProcessed && accrual > 0 {goCover_54247914884e__6[7] = 1;
+		s.balancesMu.Lock()
+		balance, exist := s.balances[userID]
+		if !exist {goCover_54247914884e__6[9] = 1;
+			balance = &domain.Balance{}
+			s.balances[userID] = balance
+		}
+		goCover_54247914884e__6[8] = 1;balance.Current += accrual
+		s.balancesMu.Unlock()
+	}
+
+	goCover_54247914884e__6[5] = 1;return nil
+}
+
+// GetBalance возвращает баланс пользователя.
+func (s *Store) GetBalance(userID int64) (domain.Balance, error) {goCover_54247914884e__7[0] = 3 ; goCover_54247914884e__7[1] = goCover_54247914884e_P ; goCover_54247914884e__7[2] = 7 ; goCover_54247914884e__7[3] = 1;
+	s.balancesMu.RLock()
+	defer s.balancesMu.RUnlock()
+
+	balance, exist := s.balances[userID]
+	if !exist {goCover_54247914884e__7[5] = 1;
+		return domain.Balance{}, nil
+	}
+	goCover_54247914884e__7[4] = 1;return *balance, nil
+}
+
+// Withdraw списывает сумму с баланса и записывает операцию.
+// Возвращает domain.ErrInsufficientFunds если баланса не хватает.
+// Обе операции должны быть атомарны: либо обе успешны, либо ни одна.
+func (s *Store) Withdraw(userID int64, orderNumber string, sum float64) error {goCover_54247914884e__8[0] = 5 ; goCover_54247914884e__8[1] = goCover_54247914884e_P ; goCover_54247914884e__8[2] = 8 ; goCover_54247914884e__8[3] = 1;
+	s.balancesMu.Lock()
+	defer s.balancesMu.Unlock()
+
+	balance, exist := s.balances[userID]
+
+	if !exist {goCover_54247914884e__8[6] = 1;
+		balance = &domain.Balance{}
+		s.balances[userID] = balance
+	}
+
+	goCover_54247914884e__8[4] = 1;if balance.Current < sum {goCover_54247914884e__8[7] = 1;
+		return domain.ErrInsufficientFunds
+	}
+
+	goCover_54247914884e__8[5] = 1;s.withdrawalsMu.Lock()
+	defer s.withdrawalsMu.Unlock()
+
+	s.idMu.Lock()
+	withdrawalID := s.nextID
+	s.nextID++
+	s.idMu.Unlock()
+
+	balance.Current -= sum
+	balance.Withdrawn += sum
+
+	withdrawal := &domain.Withdrawal{
+		ID:          withdrawalID,
+		UserID:      userID,
+		OrderNumber: orderNumber,
+		Sum:         sum,
+		ProcessedAt: time.Now(),
+	}
+
+	s.withdrawals[userID] = append(s.withdrawals[userID], withdrawal)
+
+	return nil
+}
+
+// GetWithdrawals возвращает историю списаний пользователя, сначала новые.
+func (s *Store) GetWithdrawals(userID int64) ([]domain.Withdrawal, error) {goCover_54247914884e__9[0] = 5 ; goCover_54247914884e__9[1] = goCover_54247914884e_P ; goCover_54247914884e__9[2] = 9 ; goCover_54247914884e__9[3] = 1;
+	s.withdrawalsMu.RLock()
+	defer s.withdrawalsMu.RUnlock()
+
+	var withdrawals []domain.Withdrawal
+	for _, withdrawal := range s.withdrawals[userID] {goCover_54247914884e__9[6] = 1;
+		withdrawals = append(withdrawals, *withdrawal)
+	}
+
+	goCover_54247914884e__9[4] = 1;sort.Slice(withdrawals, func(i, j int) bool {goCover_54247914884e__9[7] = 1;
+		return withdrawals[i].ProcessedAt.After(withdrawals[j].ProcessedAt)
+	})
+
+	goCover_54247914884e__9[5] = 1;return withdrawals, nil
+}
+
+// GetAllUsers возвращает всех пользователей.
+func (s *Store) GetAllUsers() ([]domain.User, error) {goCover_54247914884e__10[0] = 3 ; goCover_54247914884e__10[1] = goCover_54247914884e_P ; goCover_54247914884e__10[2] = 10 ; goCover_54247914884e__10[3] = 1;
+	s.usersMu.RLock()
+	defer s.usersMu.RUnlock()
+
+	users := make([]domain.User, 0, len(s.users))
+	for _, user := range s.users {goCover_54247914884e__10[5] = 1;
+		users = append(users, *user)
+	}
+
+	goCover_54247914884e__10[4] = 1;return users, nil
+}
+
+// GetAllOrders возвращает все заказы.
+func (s *Store) GetAllOrders() ([]domain.Order, error) {goCover_54247914884e__11[0] = 3 ; goCover_54247914884e__11[1] = goCover_54247914884e_P ; goCover_54247914884e__11[2] = 11 ; goCover_54247914884e__11[3] = 1;
+	s.ordersMu.RLock()
+	defer s.ordersMu.RUnlock()
+
+	orders := make([]domain.Order, 0, len(s.orders))
+	for _, order := range s.orders {goCover_54247914884e__11[5] = 1;
+		orders = append(orders, *order)
+	}
+
+	goCover_54247914884e__11[4] = 1;return orders, nil
+}
+
+// GetAllWithdrawals возвращает все списания всех пользователей.
+func (s *Store) GetAllWithdrawals() ([]domain.Withdrawal, error) {goCover_54247914884e__12[0] = 6 ; goCover_54247914884e__12[1] = goCover_54247914884e_P ; goCover_54247914884e__12[2] = 12 ; goCover_54247914884e__12[3] = 1;
+	s.withdrawalsMu.RLock()
+	defer s.withdrawalsMu.RUnlock()
+
+	var withdrawals []domain.Withdrawal
+	for _, userWithdrawals := range s.withdrawals {goCover_54247914884e__12[6] = 1;
+		for _, withdrawal := range userWithdrawals {goCover_54247914884e__12[7] = 1;
+			withdrawals = append(withdrawals, *withdrawal)
+		}
+	}
+
+	goCover_54247914884e__12[4] = 1;sort.Slice(withdrawals, func(i, j int) bool {goCover_54247914884e__12[8] = 1;
+		return withdrawals[i].ProcessedAt.After(withdrawals[j].ProcessedAt)
+	})
+
+	goCover_54247914884e__12[5] = 1;return withdrawals, nil
+}

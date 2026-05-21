@@ -1,0 +1,67 @@
+//line /Users/r1/PROEKT GO/a.lvov/internal/config/config.go:1:1
+// Пакет config загружает конфигурацию приложения из YAML-файла.
+// Реализуйте этот пакет самостоятельно.
+package config
+
+import (
+	"errors"
+	"os"
+
+	"gopkg.in/yaml.v3"
+)
+
+// Config содержит параметры запуска сервера.
+// Изучите config.yaml и добавьте поля самостоятельно.
+type Config struct {
+	ServerHost             string `yaml:"server_host"`
+	ServerPort             int    `yaml:"server_port"`
+	LogLevel               string `yaml:"log_level"`
+	AccrualIntervalSeconds int    `yaml:"accrual_interval_seconds"`
+	WorkerConcurrency      int    `yaml:"worker_concurrency"`
+}
+
+// Load читает конфигурацию из файла config.yaml.
+// Если файл не найден или поле не задано, применяются значения по умолчанию.
+func Load() (*Config, error) {goCover_b323f1684394__0[0] = 17 ; goCover_b323f1684394__0[1] = goCover_b323f1684394_P ; goCover_b323f1684394__0[2] = 0 ; goCover_b323f1684394__0[3] = 1;
+	cfg := &Config{
+		ServerHost:             "localhost",
+		ServerPort:             8080,
+		LogLevel:               "info",
+		AccrualIntervalSeconds: 3,
+		WorkerConcurrency:      5,
+	}
+
+	data, err := os.ReadFile("config.yaml")
+	if err != nil {goCover_b323f1684394__0[11] = 1;
+		if errors.Is(err, os.ErrNotExist) {goCover_b323f1684394__0[13] = 1;
+			return cfg, nil
+		}
+		goCover_b323f1684394__0[12] = 1;return nil, err
+	}
+
+	goCover_b323f1684394__0[4] = 1;if err := yaml.Unmarshal(data, cfg); err != nil {goCover_b323f1684394__0[14] = 1;
+		return nil, err
+	}
+
+	goCover_b323f1684394__0[5] = 1;if cfg.ServerHost == "" {goCover_b323f1684394__0[15] = 1;
+		cfg.ServerHost = "localhost"
+	}
+
+	goCover_b323f1684394__0[6] = 1;if cfg.ServerPort == 0 {goCover_b323f1684394__0[16] = 1;
+		cfg.ServerPort = 8080
+	}
+
+	goCover_b323f1684394__0[7] = 1;if cfg.LogLevel == "" {goCover_b323f1684394__0[17] = 1;
+		cfg.LogLevel = "info"
+	}
+
+	goCover_b323f1684394__0[8] = 1;if cfg.AccrualIntervalSeconds == 0 {goCover_b323f1684394__0[18] = 1;
+		cfg.AccrualIntervalSeconds = 3
+	}
+
+	goCover_b323f1684394__0[9] = 1;if cfg.WorkerConcurrency == 0 {goCover_b323f1684394__0[19] = 1;
+		cfg.WorkerConcurrency = 5
+	}
+
+	goCover_b323f1684394__0[10] = 1;return cfg, nil
+}

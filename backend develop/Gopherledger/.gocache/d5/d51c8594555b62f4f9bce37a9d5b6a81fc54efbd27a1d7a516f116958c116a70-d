@@ -1,0 +1,3 @@
+covervars.go
+auth.cover.go
+./auth_test.go

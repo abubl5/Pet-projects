@@ -1,0 +1,79 @@
+//line /Users/r1/PROEKT GO/a.lvov/cmd/server/main.go:1:1
+// Точка входа сервера. Реализуйте самостоятельно.
+//
+// Порядок инициализации:
+//  1. Загрузить конфигурацию (пакет config)
+//  2. Создать хранилище (пакет store)
+//  3. Создать сервис (пакет service)
+//  4. Запустить воркер начислений в горутине (svc.StartAccrualWorker)
+//  5. Создать обработчик и роутер (пакеты handler, router)
+//  6. Запустить HTTP-сервер
+//  7. Реализовать graceful shutdown по сигналам SIGINT и SIGTERM
+package main; import _ "runtime/coverage"
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"gopherledger/internal/config"
+	"gopherledger/internal/handler"
+	"gopherledger/internal/middleware"
+	"gopherledger/internal/router"
+	"gopherledger/internal/service"
+	"gopherledger/internal/store"
+)
+
+func main() {goCover_d70b3a362964__0[0] = 7 ; goCover_d70b3a362964__0[1] = goCover_d70b3a362964_P ; goCover_d70b3a362964__0[2] = 0 ; goCover_d70b3a362964__0[3] = 1;
+	cfg, err := config.Load()
+	if err != nil {goCover_d70b3a362964__0[6] = 1;
+		log.Fatalf("load config: %v", err)
+	}
+
+	goCover_d70b3a362964__0[4] = 1;st := store.New()
+	svc := service.New(
+		st,
+		time.Duration(cfg.AccrualIntervalSeconds)*time.Second,
+		cfg.WorkerConcurrency,
+	)
+
+	middleware.SetLogLevel(cfg.LogLevel)
+
+	h := handler.New(svc)
+	r := router.New(h)
+
+	server := &http.Server{
+		Addr:    fmt.Sprintf("%s:%d", cfg.ServerHost, cfg.ServerPort),
+		Handler: r,
+	}
+
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+
+	go svc.StartAccrualWorker(workerCtx)
+
+	go func() {goCover_d70b3a362964__0[7] = 1;
+		log.Printf("server started on %s", server.Addr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {goCover_d70b3a362964__0[8] = 1;
+			log.Fatalf("listen: %v", err)
+		}
+	}()
+
+	goCover_d70b3a362964__0[5] = 1;sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
+
+	workerCancel()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {goCover_d70b3a362964__0[9] = 1;
+		log.Printf("shutdown error: %v", err)
+	}
+}

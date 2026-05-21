@@ -1,0 +1,18 @@
+# test log
+getenv TMPDIR
+getenv PWD
+getenv PWD
+chdir /private/var/folders/qg/cqz8qgy54cl4vv2dv0s6wrnc0000gn/T/TestLoadDefaultsWhenFileMissing1711178153/001
+open config.yaml
+getenv PWD
+chdir /Users/r1/PROEKT GO/a.lvov/internal/config
+open /var/folders/qg/cqz8qgy54cl4vv2dv0s6wrnc0000gn/T
+getenv TMPDIR
+getenv PWD
+getenv PWD
+chdir /private/var/folders/qg/cqz8qgy54cl4vv2dv0s6wrnc0000gn/T/TestLoadFromYAMLAndFallbackMissingFields1515417151/001
+open /var/folders/qg/cqz8qgy54cl4vv2dv0s6wrnc0000gn/T/TestLoadFromYAMLAndFallbackMissingFields1515417151/001/config.yaml
+open config.yaml
+getenv PWD
+chdir /Users/r1/PROEKT GO/a.lvov/internal/config
+open /var/folders/qg/cqz8qgy54cl4vv2dv0s6wrnc0000gn/T

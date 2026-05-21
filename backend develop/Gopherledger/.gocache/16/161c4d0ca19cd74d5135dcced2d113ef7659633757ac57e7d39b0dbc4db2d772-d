@@ -1,0 +1,304 @@
+//line /Users/r1/PROEKT GO/a.lvov/internal/service/service.go:1:1
+// Пакет service содержит бизнес-логику приложения.
+//
+// Взаимодействие с хранилищем осуществляется через интерфейс.
+// Определите этот интерфейс здесь, по месту использования.
+package service
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"log"
+	"math/rand"
+	"sync"
+	"time"
+
+	"gopherledger/internal/auth"
+	"gopherledger/internal/domain"
+)
+
+// Service реализует бизнес-логику приложения.
+// Замените поле repo в структуре на свой интерфейс.
+//
+// processingOrders хранит номера заказов, которые сейчас обрабатываются воркером.
+// Защитите конкурентный доступ к этому полю самостоятельно.
+type Service struct {
+	repo              Repository
+	processingOrders  map[string]bool
+	processingMu      sync.Mutex
+	accrualInterval   time.Duration
+	workerConcurrency int
+}
+
+type Repository interface {
+	CreateUser(login, passwordHash string) (*domain.User, error)
+	GetUserByLogin(login string) (*domain.User, error)
+	CreateOrder(userID int64, number string) (*domain.Order, error)
+	GetUserOrders(userID int64) ([]domain.Order, error)
+	GetAllUsers() ([]domain.User, error)
+	GetAllOrders() ([]domain.Order, error)
+	GetOrdersForProcessing() ([]domain.Order, error)
+	UpdateOrderStatus(number, status string, accrual float64) error
+	GetBalance(userID int64) (domain.Balance, error)
+	Withdraw(userID int64, orderNumber string, sum float64) error
+	GetWithdrawals(userID int64) ([]domain.Withdrawal, error)
+	GetAllWithdrawals() ([]domain.Withdrawal, error)
+}
+
+// New создаёт Service.
+func New(repo Repository, accrualInterval time.Duration, workerConcurrency int) *Service {goCover_4440224eb1f1__0[0] = 5 ; goCover_4440224eb1f1__0[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__0[2] = 0 ; goCover_4440224eb1f1__0[3] = 1;
+	if accrualInterval <= 0 {goCover_4440224eb1f1__0[6] = 1;
+		accrualInterval = 3 * time.Second
+	}
+	goCover_4440224eb1f1__0[4] = 1;if workerConcurrency <= 0 {goCover_4440224eb1f1__0[7] = 1;
+		workerConcurrency = 5
+	}
+
+	goCover_4440224eb1f1__0[5] = 1;return &Service{
+		repo:              repo,
+		processingOrders:  make(map[string]bool),
+		accrualInterval:   accrualInterval,
+		workerConcurrency: workerConcurrency,
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Методы бизнес-логики - реализуйте самостоятельно
+// ---------------------------------------------------------------------------
+
+// RegisterUser регистрирует нового пользователя и возвращает токен аутентификации.
+// Хешируйте пароль перед сохранением с помощью crypto/sha256.
+func (s *Service) RegisterUser(login, password string) (string, error) {goCover_4440224eb1f1__1[0] = 5 ; goCover_4440224eb1f1__1[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__1[2] = 1 ; goCover_4440224eb1f1__1[3] = 1;
+	hash := sha256.Sum256([]byte(password))
+	passwordHash := hex.EncodeToString(hash[:])
+
+	user, err := s.repo.CreateUser(login, passwordHash)
+	if err != nil {goCover_4440224eb1f1__1[6] = 1;
+		return "", err
+	}
+
+	goCover_4440224eb1f1__1[4] = 1;token, err := auth.GenerateToken(user.ID)
+	if err != nil {goCover_4440224eb1f1__1[7] = 1;
+		return "", err
+	}
+
+	goCover_4440224eb1f1__1[5] = 1;return token, nil
+}
+
+// LoginUser проверяет учётные данные и возвращает токен аутентификации.
+func (s *Service) LoginUser(login, password string) (string, error) {goCover_4440224eb1f1__2[0] = 7 ; goCover_4440224eb1f1__2[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__2[2] = 2 ; goCover_4440224eb1f1__2[3] = 1;
+	user, err := s.repo.GetUserByLogin(login)
+	if err != nil {goCover_4440224eb1f1__2[7] = 1;
+		return "", err
+	}
+
+	goCover_4440224eb1f1__2[4] = 1;hash := sha256.Sum256([]byte(password))
+	passwordHash := hex.EncodeToString(hash[:])
+
+	if user.PasswordHash != passwordHash {goCover_4440224eb1f1__2[8] = 1;
+		return "", domain.ErrInvalidPassword
+	}
+
+	goCover_4440224eb1f1__2[5] = 1;token, err := auth.GenerateToken(user.ID)
+	if err != nil {goCover_4440224eb1f1__2[9] = 1;
+		return "", err
+	}
+
+	goCover_4440224eb1f1__2[6] = 1;return token, nil
+}
+
+// CreateOrder проверяет номер заказа по алгоритму Луна и сохраняет заказ.
+func (s *Service) CreateOrder(userID int64, number string) (*domain.Order, error) {goCover_4440224eb1f1__3[0] = 3 ; goCover_4440224eb1f1__3[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__3[2] = 3 ; goCover_4440224eb1f1__3[3] = 1;
+	if !validateLuhn(number) {goCover_4440224eb1f1__3[5] = 1;
+		return nil, domain.ErrInvalidOrder
+	}
+
+	goCover_4440224eb1f1__3[4] = 1;return s.repo.CreateOrder(userID, number)
+}
+
+// GetUserOrders возвращает все заказы пользователя.
+func (s *Service) GetUserOrders(userID int64) ([]domain.Order, error) {goCover_4440224eb1f1__4[0] = 1 ; goCover_4440224eb1f1__4[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__4[2] = 4 ; goCover_4440224eb1f1__4[3] = 1;
+	return s.repo.GetUserOrders(userID)
+}
+
+// GetBalance возвращает текущий баланс пользователя.
+func (s *Service) GetBalance(userID int64) (domain.Balance, error) {goCover_4440224eb1f1__5[0] = 1 ; goCover_4440224eb1f1__5[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__5[2] = 5 ; goCover_4440224eb1f1__5[3] = 1;
+	return s.repo.GetBalance(userID)
+}
+
+// Withdraw проверяет номер заказа по алгоритму Луна и списывает сумму с баланса.
+func (s *Service) Withdraw(userID int64, orderNumber string, sum float64) error {goCover_4440224eb1f1__6[0] = 3 ; goCover_4440224eb1f1__6[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__6[2] = 6 ; goCover_4440224eb1f1__6[3] = 1;
+	if !validateLuhn(orderNumber) {goCover_4440224eb1f1__6[5] = 1;
+		return domain.ErrInvalidOrder
+	}
+
+	goCover_4440224eb1f1__6[4] = 1;return s.repo.Withdraw(userID, orderNumber, sum)
+}
+
+// GetWithdrawals возвращает историю списаний пользователя.
+func (s *Service) GetWithdrawals(userID int64) ([]domain.Withdrawal, error) {goCover_4440224eb1f1__7[0] = 1 ; goCover_4440224eb1f1__7[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__7[2] = 7 ; goCover_4440224eb1f1__7[3] = 1;
+	return s.repo.GetWithdrawals(userID)
+}
+
+// GetAllUsers возвращает всех пользователей.
+func (s *Service) GetAllUsers() ([]domain.User, error) {goCover_4440224eb1f1__8[0] = 1 ; goCover_4440224eb1f1__8[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__8[2] = 8 ; goCover_4440224eb1f1__8[3] = 1;
+	return s.repo.GetAllUsers()
+}
+
+// GetAllOrders возвращает все заказы.
+func (s *Service) GetAllOrders() ([]domain.Order, error) {goCover_4440224eb1f1__9[0] = 1 ; goCover_4440224eb1f1__9[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__9[2] = 9 ; goCover_4440224eb1f1__9[3] = 1;
+	return s.repo.GetAllOrders()
+}
+
+// GetAllWithdrawals возвращает все списания.
+func (s *Service) GetAllWithdrawals() ([]domain.Withdrawal, error) {goCover_4440224eb1f1__10[0] = 1 ; goCover_4440224eb1f1__10[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__10[2] = 10 ; goCover_4440224eb1f1__10[3] = 1;
+	return s.repo.GetAllWithdrawals()
+}
+
+// validateLuhn проверяет контрольную сумму номера заказа по алгоритму Луна.
+// Вызывается при загрузке заказа и при списании баллов.
+func validateLuhn(number string) bool {goCover_4440224eb1f1__11[0] = 10 ; goCover_4440224eb1f1__11[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__11[2] = 11 ; goCover_4440224eb1f1__11[3] = 1;
+	if number == "" {goCover_4440224eb1f1__11[6] = 1;
+		return false
+	}
+
+	goCover_4440224eb1f1__11[4] = 1;sum := 0
+	double := false
+
+	for i := len(number) - 1; i >= 0; i-- {goCover_4440224eb1f1__11[7] = 1;
+		digit := int(number[i] - '0')
+
+		if digit < 0 || digit > 9 {goCover_4440224eb1f1__11[10] = 1;
+			return false
+		}
+
+		goCover_4440224eb1f1__11[8] = 1;if double {goCover_4440224eb1f1__11[11] = 1;
+			digit *= 2
+			if digit > 9 {goCover_4440224eb1f1__11[12] = 1;
+				digit -= 9
+			}
+		}
+
+		goCover_4440224eb1f1__11[9] = 1;sum += digit
+		double = !double
+	}
+
+	goCover_4440224eb1f1__11[5] = 1;return sum%10 == 0
+}
+
+// ---------------------------------------------------------------------------
+// Воркер начислений
+//
+// StartAccrualWorker предоставлен. Реализуйте processAllPendingOrders
+// и processOrder самостоятельно.
+//
+// Это самая интересная часть проекта: конкурентная обработка заказов.
+// Подумайте, как защитить доступ к processingOrders из нескольких горутин.
+// ---------------------------------------------------------------------------
+
+// StartAccrualWorker запускает фоновый цикл, который каждые 3 секунды
+// передаёт необработанные заказы в processAllPendingOrders.
+// Останавливается при отмене ctx.
+func (s *Service) StartAccrualWorker(ctx context.Context) {goCover_4440224eb1f1__12[0] = 4 ; goCover_4440224eb1f1__12[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__12[2] = 12 ; goCover_4440224eb1f1__12[3] = 1;
+	ticker := time.NewTicker(s.accrualInterval)
+	defer ticker.Stop()
+
+	for {goCover_4440224eb1f1__12[4] = 1;
+		select {
+		case <-ctx.Done():goCover_4440224eb1f1__12[5] = 1;
+			return
+		case <-ticker.C:goCover_4440224eb1f1__12[6] = 1;
+			s.processAllPendingOrders(ctx)
+		}
+	}
+}
+
+// processAllPendingOrders получает заказы для обработки и запускает горутины.
+// Реализуйте самостоятельно.
+func (s *Service) processAllPendingOrders(ctx context.Context) {goCover_4440224eb1f1__13[0] = 10 ; goCover_4440224eb1f1__13[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__13[2] = 13 ; goCover_4440224eb1f1__13[3] = 1;
+	orders, err := s.repo.GetOrdersForProcessing()
+	if err != nil {goCover_4440224eb1f1__13[6] = 1;
+		log.Printf("воркер: ошибка получения заказов: %v", err)
+		return
+	}
+
+	goCover_4440224eb1f1__13[4] = 1;var wg sync.WaitGroup
+	sem := make(chan struct{}, s.workerConcurrency)
+
+	for _, order := range orders {goCover_4440224eb1f1__13[7] = 1;
+		s.processingMu.Lock()
+		if s.processingOrders[order.Number] {goCover_4440224eb1f1__13[9] = 1;
+			s.processingMu.Unlock()
+			continue
+		}
+		goCover_4440224eb1f1__13[8] = 1;s.processingOrders[order.Number] = true
+		s.processingMu.Unlock()
+
+		wg.Add(1)
+		sem <- struct{}{}
+
+		number := order.Number
+
+		go func() {goCover_4440224eb1f1__13[10] = 1;
+			defer wg.Done()
+			defer func() {goCover_4440224eb1f1__13[12] = 1; <-sem }()
+
+			goCover_4440224eb1f1__13[11] = 1;s.processOrder(ctx, number)
+		}()
+	}
+
+	goCover_4440224eb1f1__13[5] = 1;wg.Wait()
+}
+
+// processOrder обрабатывает один заказ. Реализуйте самостоятельно.
+// Используйте вспомогательные функции ниже для генерации случайных значений.
+func (s *Service) processOrder(ctx context.Context, number string) {goCover_4440224eb1f1__14[0] = 13 ; goCover_4440224eb1f1__14[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__14[2] = 14 ; goCover_4440224eb1f1__14[3] = 1;
+	defer func() {goCover_4440224eb1f1__14[8] = 1;
+		s.processingMu.Lock()
+		delete(s.processingOrders, number)
+		s.processingMu.Unlock()
+	}()
+
+	goCover_4440224eb1f1__14[4] = 1;if err := s.repo.UpdateOrderStatus(number, domain.OrderStatusProcessing, 0); err != nil {goCover_4440224eb1f1__14[9] = 1;
+		log.Printf("воркер: ошибка установки PROCESSING для заказа %s: %v", number, err)
+		return
+	}
+
+	goCover_4440224eb1f1__14[5] = 1;select {
+	case <-ctx.Done():goCover_4440224eb1f1__14[10] = 1;
+		return
+	case <-time.After(randomDelay()):goCover_4440224eb1f1__14[11] = 1;
+	}
+
+	goCover_4440224eb1f1__14[6] = 1;if isInvalid() {goCover_4440224eb1f1__14[12] = 1;
+		if err := s.repo.UpdateOrderStatus(number, domain.OrderStatusInvalid, 0); err != nil {goCover_4440224eb1f1__14[14] = 1;
+			log.Printf("воркер: ошибка установки INVALID для заказа %s: %v", number, err)
+		}
+		goCover_4440224eb1f1__14[13] = 1;return
+	}
+
+	goCover_4440224eb1f1__14[7] = 1;accrual := randomAccrual()
+	if err := s.repo.UpdateOrderStatus(number, domain.OrderStatusProcessed, accrual); err != nil {goCover_4440224eb1f1__14[15] = 1;
+		log.Printf("воркер: ошибка установки PROCESSED для заказа %s: %v", number, err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Вспомогательные функции - предоставлены
+// ---------------------------------------------------------------------------
+
+// randomAccrual возвращает случайное начисление от 10 до 500 баллов.
+func randomAccrual() float64 {goCover_4440224eb1f1__15[0] = 1 ; goCover_4440224eb1f1__15[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__15[2] = 15 ; goCover_4440224eb1f1__15[3] = 1;
+	return float64(rand.Intn(491) + 10)
+}
+
+// randomDelay возвращает случайную задержку от 2 до 6 секунд.
+func randomDelay() time.Duration {goCover_4440224eb1f1__16[0] = 1 ; goCover_4440224eb1f1__16[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__16[2] = 16 ; goCover_4440224eb1f1__16[3] = 1;
+	return time.Duration(rand.Intn(5)+2) * time.Second
+}
+
+// isInvalid возвращает true примерно в 10% случаев.
+func isInvalid() bool {goCover_4440224eb1f1__17[0] = 1 ; goCover_4440224eb1f1__17[1] = goCover_4440224eb1f1_P ; goCover_4440224eb1f1__17[2] = 17 ; goCover_4440224eb1f1__17[3] = 1;
+	return rand.Intn(10) == 0
+}
