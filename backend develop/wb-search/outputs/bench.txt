@@ -1,0 +1,5 @@
+goos: darwin
+goarch: amd64
+pkg: wb-search/internal/service
+cpu: VirtualApple @ 2.50GHz
+BenchmarkTopServiceGetTop-10    	    4022	    292339 ns/op	   24672 B/op	       4 allocs/op
